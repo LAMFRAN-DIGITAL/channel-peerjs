@@ -63,6 +63,8 @@ export declare class PeerjsChannel implements Channel {
     private _waiting;
     /** The data connection is open: start() resolves at once. */
     private _started;
+    /** First error reported by PeerJS (relay unreachable, unknown peer…), kept if it comes before start(). */
+    _error?: string;
     /**
      * @param key shared secret (hex, 32 bytes) ; absent: a new one (initiator).
      * @param status initiator or receiver (default: receiver when a key is given).
