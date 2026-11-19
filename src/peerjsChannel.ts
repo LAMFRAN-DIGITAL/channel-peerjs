@@ -136,6 +136,11 @@ export class PeerjsChannel implements Channel {
   _onStarted!: () => void;
   _onError!: (error: string) => void;
   _onData!: (data: crypto.Buffer) => void;
+  /** Messages received while no receive() was pending (they used to be dropped). */
+  private _queue: crypto.Buffer[] = [];
+  private _waiting: ((data: crypto.Buffer) => void)[] = [];
+  /** The data connection is open: start() resolves at once. */
+  private _started = false;
 
   /**
    * @param key shared secret (hex, 32 bytes) ; absent: a new one (initiator).
@@ -176,10 +181,13 @@ export class PeerjsChannel implements Channel {
         delete that._onConnected;
         that.conn = conn;
         that.conn.on("data", (data: string) => {
-          that._onData(crypto.Buffer.from(data, "base64"));
+          that._deliver(crypto.Buffer.from(data, "base64"));
         });
         that.conn.on("close", () => that.peer.destroy());
-        that._onStarted();
+        // "connection" fires before the data channel is open: a message sent now would be lost.
+        // Resolve start() only once the connection is open.
+        if (conn.open) that._markStarted();
+        else conn.once("open", () => that._markStarted());
       });
     }
     CryptoChannel.encryptChannel(this, crypto.Buffer.from(this.key, "hex"));
@@ -206,21 +214,41 @@ export class PeerjsChannel implements Channel {
   async start() {
     const that = this;
     if (this.status === "receiver") {
-      this.conn = this.peer.connect(this.otherid, { reliable: true });
-      that.conn.on("open", () => {
-        that._onConnected?.();
-        delete that._onConnected;
-        that.conn.on("data", (data: string) => {
-          that._onData(crypto.Buffer.from(data, "base64"));
+      const connect = () => {
+        that.conn = that.peer.connect(that.otherid, { reliable: true });
+        that.conn.on("open", () => {
+          that._onConnected?.();
+          delete that._onConnected;
+          that.conn.on("data", (data: string) => {
+            that._deliver(crypto.Buffer.from(data, "base64"));
+          });
+          that.conn.on("close", () => that.peer.destroy());
+          that._markStarted();
         });
-        that.conn.on("close", () => that.peer.destroy());
-        that._onStarted();
-      });
+      };
+      // Dial only once our own peer is registered with the signalling server: an offer sent before
+      // that can be dropped, leaving start() pending forever.
+      if (this.peer.open) connect();
+      else this.peer.once("open", connect);
     }
     return new Promise<void>((resolve, reject) => {
+      // the initiator's connection may already be open when start() is called
+      if (that._started) return resolve();
       that._onStarted = resolve;
       this._onError = reject;
     });
+  }
+
+  _markStarted() {
+    this._started = true;
+    this._onStarted?.();
+  }
+
+  /** Hands a message to the oldest pending receive(), or keeps it until the next one. */
+  _deliver(data: crypto.Buffer) {
+    const waiting = this._waiting.shift();
+    if (waiting) waiting(data);
+    else this._queue.push(data);
   }
 
   async send(data: crypto.Buffer) {
@@ -228,8 +256,9 @@ export class PeerjsChannel implements Channel {
   }
 
   async receive(): Promise<crypto.Buffer> {
-    const that = this;
-    return new Promise((resolve) => (that._onData = resolve));
+    const queued = this._queue.shift();
+    if (queued) return queued;
+    return new Promise((resolve) => this._waiting.push(resolve));
   }
 
   close() {
