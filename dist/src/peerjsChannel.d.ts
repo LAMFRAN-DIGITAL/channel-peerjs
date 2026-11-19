@@ -58,6 +58,11 @@ export declare class PeerjsChannel implements Channel {
     _onStarted: () => void;
     _onError: (error: string) => void;
     _onData: (data: crypto.Buffer) => void;
+    /** Messages received while no receive() was pending (they used to be dropped). */
+    private _queue;
+    private _waiting;
+    /** The data connection is open: start() resolves at once. */
+    private _started;
     /** First error reported by PeerJS (relay unreachable, unknown peer…), kept if it comes before start(). */
     _error?: string;
     /**
@@ -71,6 +76,9 @@ export declare class PeerjsChannel implements Channel {
     getConnectionString(): string;
     onConnected(callback: () => void): void;
     start(): Promise<void>;
+    _markStarted(): void;
+    /** Hands a message to the oldest pending receive(), or keeps it until the next one. */
+    _deliver(data: crypto.Buffer): void;
     send(data: crypto.Buffer): Promise<void>;
     receive(): Promise<crypto.Buffer>;
     close(): Promise<void>;
