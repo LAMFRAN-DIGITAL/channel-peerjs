@@ -131,6 +131,14 @@ export class PeerjsChannel {
             },
         };
         this.peer = new Peer(this.id, options);
+        // The logFunction above only runs when `debug` is at least 1: listen to the Peer's own errors as well, so that an
+        // unreachable relay or an unknown peer rejects start() instead of leaving it pending forever.
+        this.peer.on("error", (error) => {
+            const type = error?.type;
+            const message = type ? `peerjs: ${type}` : String(error);
+            this._error ??= message;
+            this._onError?.(message);
+        });
         if (this.status == "initiator") {
             const that = this;
             that.peer.on("connection", (conn) => {
@@ -176,6 +184,8 @@ export class PeerjsChannel {
             });
         }
         return new Promise((resolve, reject) => {
+            if (that._error)
+                return reject(that._error);
             that._onStarted = resolve;
             this._onError = reject;
         });

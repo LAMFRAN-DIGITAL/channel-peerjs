@@ -136,6 +136,8 @@ export class PeerjsChannel implements Channel {
   _onStarted!: () => void;
   _onError!: (error: string) => void;
   _onData!: (data: crypto.Buffer) => void;
+  /** First error reported by PeerJS (relay unreachable, unknown peer…), kept if it comes before start(). */
+  _error?: string;
 
   /**
    * @param key shared secret (hex, 32 bytes) ; absent: a new one (initiator).
@@ -169,6 +171,14 @@ export class PeerjsChannel implements Channel {
       },
     };
     this.peer = new Peer(this.id, options);
+    // The logFunction above only runs when `debug` is at least 1: listen to the Peer's own errors as well, so that an
+    // unreachable relay or an unknown peer rejects start() instead of leaving it pending forever.
+    this.peer.on("error", (error: unknown) => {
+      const type = (error as { type?: string } | null)?.type;
+      const message = type ? `peerjs: ${type}` : String(error);
+      this._error ??= message;
+      this._onError?.(message);
+    });
     if (this.status == "initiator") {
       const that = this;
       that.peer.on("connection", (conn) => {
@@ -218,6 +228,7 @@ export class PeerjsChannel implements Channel {
       });
     }
     return new Promise<void>((resolve, reject) => {
+      if (that._error) return reject(that._error);
       that._onStarted = resolve;
       this._onError = reject;
     });
