@@ -58,6 +58,8 @@ export declare class PeerjsChannel implements Channel {
     _onStarted: () => void;
     _onError: (error: string) => void;
     _onData: (data: crypto.Buffer) => void;
+    /** First error reported by PeerJS (relay unreachable, unknown peer…), kept if it comes before start(). */
+    _error?: string;
     /**
      * @param key shared secret (hex, 32 bytes) ; absent: a new one (initiator).
      * @param status initiator or receiver (default: receiver when a key is given).
