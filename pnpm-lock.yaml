@@ -12,12 +12,8 @@ importers:
         specifier: '>=2.4.1'
         version: 2.4.1
       peerjs:
-        specifier: ^1.5.4
-        version: 1.5.4
-    optionalDependencies:
-      wrtc:
-        specifier: ^0.4.7
-        version: 0.4.7
+        specifier: ^1.5.5
+        version: 1.5.5
     devDependencies:
       '@playwright/test':
         specifier: ^1.51.1
@@ -618,10 +614,6 @@ packages:
     resolution: {integrity: sha512-uIFDxqpRZGZ6ThOk84hEfqWoHx2devRFvpTZcTHur85vImfaxUbTW9Ryh4CpCuDnToOP1CEtXKIgytHBPVff5A==}
     engines: {node: '>=0.3.1'}
 
-  domexception@1.0.1:
-    resolution: {integrity: sha512-raigMkn7CJNNo6Ihro1fzG7wr3fHuYVytzquZKX5n0yizGsTcYgzdIUwj1X9pK0VvjeihV+XiclP+DjwbsSKug==}
-    deprecated: Use your platform's native DOMException instead
-
   dunder-proto@1.0.1:
     resolution: {integrity: sha512-KIN/nDJBQRcXw0MLVhZE9iQHmG68qAVIBg9CqmUYjmQIhgij9U5MFvrqkUL5FbtyyzZuOeOt0zdeRe4UY7ct+A==}
     engines: {node: '>= 0.4'}
@@ -1056,8 +1048,8 @@ packages:
     resolution: {integrity: sha512-YIwCC+pTzp3Bi8jPI9UFKO0t0SLo6xALnHkiNt/iUFmUUZG0fEEmEyFKvjsDKweiFitzHRyhuh6NvyJZ4nNxMg==}
     engines: {node: '>= 14.0.0'}
 
-  peerjs@1.5.4:
-    resolution: {integrity: sha512-yFsoLMnurJKlQbx6kVSBpOp+AlNldY1JQS2BrSsHLKCZnq6t7saHleuHM5svuLNbQkUJXHLF3sKOJB1K0xulOw==}
+  peerjs@1.5.5:
+    resolution: {integrity: sha512-viMUCPDL6CSfOu0ZqVcFqbWRXNHIbv2lPqNbrBIjbFYrflebOjItJ4hPfhjnuUCstqciHVu9vVJ7jFqqKi/EuQ==}
     engines: {node: '>= 14'}
 
   picocolors@1.1.1:
@@ -1341,9 +1333,6 @@ packages:
     resolution: {integrity: sha512-TnbFSbcOCcDgjZ4piURLCbJ3nJhznVh9kw6F6iokjiFPl8ONxe9A6nMDVXDiNbrSfLILs6vB07F7wLBrwPYzJw==}
     engines: {node: '>=10.13.0'}
 
-  webidl-conversions@4.0.2:
-    resolution: {integrity: sha512-YQ+BmxuTgd6UXZW3+ICGfyqRyHXVlD5GtQr5+qjiNW7bF0cqrzX500HVXPBOvgXb5YnzDd+h0zqyv61KUD7+Sg==}
-
   webpack-cli@6.0.1:
     resolution: {integrity: sha512-MfwFQ6SfwinsUVi0rNJm7rHZ31GyTcpVE5pgVA3hwFRb7COD4TzjUUwhGWKfO50+xdc2MQPuEBBJoqIMGt3JDw==}
     engines: {node: '>=18.12.0'}
@@ -1401,12 +1390,6 @@ packages:
 
   wrappy@1.0.2:
     resolution: {integrity: sha512-l4Sp/DRseor9wL6EvV2+TuQn63dMkPjZ/sp9XkghTEbV9KlPS1xUsZ3u7/IQO4wxtcFB4bgpQPRcR3QCvezPcQ==}
-
-  wrtc@0.4.7:
-    resolution: {integrity: sha512-P6Hn7VT4lfSH49HxLHcHhDq+aFf/jd9dPY7lDHeFhZ22N3858EKuwm2jmnlPzpsRGEPaoF6XwkcxY5SYnt4f/g==}
-    engines: {node: ^8.11.2 || >=10.0.0}
-    bundledDependencies:
-      - node-pre-gyp
 
   y18n@5.0.8:
     resolution: {integrity: sha512-0pfFzegeDWJHJIAmTLRP2DwHjdF5s7jo9tuztdQxAhINCdvS+3nGINqPd00AphqJR/0LhANUS6/+7SCb98YOfA==}
@@ -2000,11 +1983,6 @@ snapshots:
 
   diff@5.2.0: {}
 
-  domexception@1.0.1:
-    dependencies:
-      webidl-conversions: 4.0.2
-    optional: true
-
   dunder-proto@1.0.1:
     dependencies:
       call-bind-apply-helpers: 1.0.2
@@ -2439,7 +2417,7 @@ snapshots:
 
   peerjs-js-binarypack@2.1.0: {}
 
-  peerjs@1.5.4:
+  peerjs@1.5.5:
     dependencies:
       '@msgpack/msgpack': 2.8.0
       eventemitter3: 4.0.7
@@ -2714,9 +2692,6 @@ snapshots:
       glob-to-regexp: 0.4.1
       graceful-fs: 4.2.11
 
-  webidl-conversions@4.0.2:
-    optional: true
-
   webpack-cli@6.0.1(webpack@5.98.0):
     dependencies:
       '@discoveryjs/json-ext': 0.6.3
@@ -2797,11 +2772,6 @@ snapshots:
       strip-ansi: 6.0.1
 
   wrappy@1.0.2: {}
-
-  wrtc@0.4.7:
-    optionalDependencies:
-      domexception: 1.0.1
-    optional: true
 
   y18n@5.0.8: {}
 
