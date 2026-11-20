@@ -1,8 +1,6 @@
 import { Peer } from "peerjs";
 import { CryptoChannel, crypto } from "@vaultys/id";
 const { randomBytes } = crypto;
-/** Signalling server used when nothing else is given (unchanged default, for backward compatibility). */
-export const DEFAULT_HOST = "peerjs.92k.de";
 const MAX_ICE_SERVERS = 4;
 const MAX_ICE_LENGTH = 2048;
 const ICE_SCHEME = /^(stun|stuns|turn|turns):[^\s]{1,253}$/;
@@ -33,25 +31,38 @@ export function validIceServers(value) {
     }
     return out;
 }
+/** Throws a clear error unless a signalling host and an explicit list of ICE servers are given. */
+export function checkOptions(options) {
+    const { host, iceServers } = (options ?? {});
+    if (typeof host !== "string" || !HOST.test(host)) {
+        throw new Error("PeerjsChannel: a signalling server `host` is mandatory (there is no default public server)");
+    }
+    if (iceServers === undefined || validIceServers(iceServers) === null) {
+        throw new Error("PeerjsChannel: `iceServers` is mandatory (an explicit list, `[]` for none); PeerJS public STUN/TURN servers are never used");
+    }
+}
 /**
- * Builds `vaultys://peerjs?key=…&host=…[&port=…][&path=…][&secure=0][&ice=…]`. `ice` is the base64url of the JSON
- * array of ICE servers. Older receivers ignore the new parameters and keep their previous behaviour.
+ * Builds `vaultys://peerjs?key=…&host=…[&port=…][&path=…][&secure=0]&ice=…`. `ice` is the base64url of the JSON
+ * array of ICE servers, always present.
  */
-export function buildConnectionString(key, options = {}) {
-    const params = new URLSearchParams({ key, host: options.host ?? DEFAULT_HOST });
+export function buildConnectionString(key, options) {
+    checkOptions(options);
+    const params = new URLSearchParams({ key, host: options.host });
     if (options.port !== undefined)
         params.set("port", String(options.port));
     if (options.path !== undefined && options.path !== "/")
         params.set("path", options.path);
     if (options.secure === false)
         params.set("secure", "0");
-    if (options.iceServers !== undefined)
-        params.set("ice", b64url(JSON.stringify(options.iceServers)));
+    params.set("ice", b64url(JSON.stringify(options.iceServers)));
     return `vaultys://peerjs?${params.toString()}`;
 }
-/** Parses a connection string ; `null` if it is not a PeerJS one or if any parameter is invalid (never a silent fallback). */
-export function parseConnectionString(string) {
-    if (!string.startsWith("vaultys://peerjs?"))
+/**
+ * Parses a connection string (from a link or a QR code) ; `null` if it is not a PeerJS one, if any parameter is
+ * invalid or missing (`ice` included), or if its host is not in `allowedHosts` (never a silent fallback).
+ */
+export function parseConnectionString(string, allowedHosts) {
+    if (typeof string !== "string" || !string.startsWith("vaultys://peerjs?"))
         return null;
     let url;
     try {
@@ -65,7 +76,9 @@ export function parseConnectionString(string) {
     const host = p.get("host");
     if (!key || !KEY.test(key) || !host || !HOST.test(host))
         return null;
-    const options = { host, secure: p.get("secure") !== "0" };
+    if (!Array.isArray(allowedHosts) || !allowedHosts.some((allowed) => typeof allowed === "string" && allowed.toLowerCase() === host.toLowerCase()))
+        return null;
+    const options = { host, secure: p.get("secure") !== "0", iceServers: [] };
     const port = p.get("port");
     if (port !== null) {
         const n = Number(port);
@@ -79,38 +92,38 @@ export function parseConnectionString(string) {
             return null;
         options.path = path;
     }
+    // ICE servers are mandatory: without them the receiver would fall back to PeerJS public STUN/TURN servers.
     const ice = p.get("ice");
-    if (ice !== null) {
-        if (ice.length > MAX_ICE_LENGTH)
-            return null;
-        let parsed;
-        try {
-            parsed = JSON.parse(fromB64url(ice));
-        }
-        catch {
-            return null;
-        }
-        const servers = validIceServers(parsed);
-        if (!servers)
-            return null;
-        options.iceServers = servers;
+    if (ice === null || ice.length > MAX_ICE_LENGTH)
+        return null;
+    let parsed;
+    try {
+        parsed = JSON.parse(fromB64url(ice));
     }
+    catch {
+        return null;
+    }
+    const servers = validIceServers(parsed);
+    if (!servers)
+        return null;
+    options.iceServers = servers;
     return { key, options };
 }
 export class PeerjsChannel {
     /**
      * @param key shared secret (hex, 32 bytes) ; absent: a new one (initiator).
      * @param status initiator or receiver (default: receiver when a key is given).
-     * @param hostOrOptions signalling host (former signature), or the full options.
+     * @param options signalling server and ICE servers, both mandatory (no default public server).
      */
-    constructor(key, status, hostOrOptions = DEFAULT_HOST) {
+    constructor(key, status, options) {
         /** Messages received while no receive() was pending (they used to be dropped). */
         this._queue = [];
         this._waiting = [];
         /** The data connection is open: start() resolves at once. */
         this._started = false;
-        this.options = typeof hostOrOptions === "string" ? { host: hostOrOptions } : { ...hostOrOptions };
-        this.host = this.options.host ?? DEFAULT_HOST;
+        checkOptions(options);
+        this.options = { ...options };
+        this.host = this.options.host;
         if (status) {
             this.status = status;
         }
@@ -121,21 +134,22 @@ export class PeerjsChannel {
         this.key = key ?? randomBytes(32).toString("hex");
         this.id = crypto.hash("sha256", crypto.Buffer.from(`vaultys-${this.status}-${this.key}`)).toString("hex");
         this.otherid = crypto.hash("sha256", crypto.Buffer.from(`vaultys-${this.otherstatus}-${this.key}`)).toString("hex");
-        const options = {
+        const peerOptions = {
             debug: this.options.debug ?? 0,
             host: this.host,
             secure: this.options.secure ?? true,
             ...(this.options.port !== undefined ? { port: this.options.port } : {}),
             ...(this.options.path !== undefined ? { path: this.options.path } : {}),
-            // Without `config`, PeerJS uses its own public STUN/TURN servers ; with it, ONLY the given ones.
-            ...(this.options.iceServers !== undefined ? { config: { iceServers: this.options.iceServers } } : {}),
+            // Always given: without `config`, PeerJS 1.5.5 uses its own public STUN/TURN servers (Google, peerjs.com) ;
+            // with it, ONLY the given ones (`config` replaces PeerJS's default configuration as a whole).
+            config: { iceServers: this.options.iceServers },
             logFunction: (level, ...rest) => {
                 if (level.toString() === "Error:") {
                     this._onError?.(String(rest[0]));
                 }
             },
         };
-        this.peer = new Peer(this.id, options);
+        this.peer = new Peer(this.id, peerOptions);
         // The logFunction above only runs when `debug` is at least 1: listen to the Peer's own errors as well, so that an
         // unreachable relay or an unknown peer rejects start() instead of leaving it pending forever.
         this.peer.on("error", (error) => {
@@ -164,11 +178,12 @@ export class PeerjsChannel {
         }
         CryptoChannel.encryptChannel(this, crypto.Buffer.from(this.key, "hex"));
     }
-    static fromConnectionString(string, options = {}) {
-        const parsed = parseConnectionString(string);
+    /** Receiver side: `null` if the string is invalid or names a host outside `options.allowedHosts`. */
+    static fromConnectionString(string, options) {
+        const parsed = parseConnectionString(string, options?.allowedHosts);
         if (!parsed)
             return null;
-        return new PeerjsChannel(parsed.key, "receiver", { ...parsed.options, ...options });
+        return new PeerjsChannel(parsed.key, "receiver", { ...parsed.options, ...(options.debug !== undefined ? { debug: options.debug } : {}) });
     }
     fromConnectionString(string, options) {
         return PeerjsChannel.fromConnectionString(string, options);

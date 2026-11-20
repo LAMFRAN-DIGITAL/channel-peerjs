@@ -25,6 +25,9 @@ class FakePeer extends EventEmitter {
   destroy() {}
 }
 
+// Local, unreachable: these fakes never reach any server.
+const OPTIONS = { host: "localhost", port: 9, secure: false, iceServers: [] };
+
 const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 /** The real Peer reports "browser-incompatible" under Node: drop it, it is replaced by the fake one. */
@@ -34,7 +37,7 @@ function forgetRealPeer(channel: PeerjsChannel) {
 
 /** An initiator whose real Peer is swapped for a fake one; the "connection" listener is re-registered on it. */
 function initiator() {
-  const channel = new PeerjsChannel(undefined, "initiator");
+  const channel = new PeerjsChannel(undefined, "initiator", OPTIONS);
   (channel.peer as unknown as EventEmitter).removeAllListeners("error");
   channel.peer.destroy();
   const fake = new FakePeer();
@@ -46,7 +49,7 @@ function initiator() {
 }
 
 function receiver(key: string) {
-  const channel = new PeerjsChannel(key, "receiver");
+  const channel = new PeerjsChannel(key, "receiver", OPTIONS);
   (channel.peer as unknown as EventEmitter).removeAllListeners("error");
   channel.peer.destroy();
   const fake = new FakePeer();

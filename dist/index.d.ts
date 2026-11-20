@@ -1,2 +1,2 @@
-export { PeerjsChannel, DEFAULT_HOST, buildConnectionString, parseConnectionString, validIceServers } from "./src/peerjsChannel";
-export type { PeerjsChannelOptions, PeerjsConnection, IceServer } from "./src/peerjsChannel";
+export { PeerjsChannel, buildConnectionString, checkOptions, parseConnectionString, validIceServers } from "./src/peerjsChannel";
+export type { PeerjsChannelOptions, PeerjsConnection, PeerjsReceiverOptions, IceServer } from "./src/peerjsChannel";

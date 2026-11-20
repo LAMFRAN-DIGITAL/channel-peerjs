@@ -1,11 +1,18 @@
 import { expect } from "chai";
 import { IdManager, MemoryStorage, VaultysId } from "@vaultys/id";
 import { PeerjsChannel } from "../src/peerjsChannel";
+// BROWSER ONLY, with a real signalling server: this test needs WebRTC (absent from Node; the former optional `wrtc`
+// package is gone and PeerJS never used it anyway) and a network. There is no default public server any more: the
+// page that runs it must define `globalThis.PEERJS_TEST_OPTIONS = { host, iceServers, … }` (a server of the SAS),
+// otherwise the test is skipped. Not matched by `test/*.test.ts`, so `test:node` does not run it.
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-describe("PeerjsChannel tests", () => {
-    it("Start and stop", async () => {
-        const channel1 = new PeerjsChannel();
-        const channel2 = new PeerjsChannel(channel1.key);
+const testOptions = globalThis.PEERJS_TEST_OPTIONS;
+describe("PeerjsChannel tests (browser, network)", () => {
+    it("Start and stop", async function () {
+        if (!testOptions || typeof RTCPeerConnection === "undefined")
+            return this.skip();
+        const channel1 = new PeerjsChannel(undefined, "initiator", testOptions);
+        const channel2 = new PeerjsChannel(channel1.key, "receiver", testOptions);
         const s1 = MemoryStorage(() => { });
         const s2 = MemoryStorage(() => { });
         const manager1 = new IdManager(await VaultysId.generatePerson(), s1);
