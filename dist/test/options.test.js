@@ -43,7 +43,7 @@ describe("PeerjsChannel mandatory options (no network)", () => {
         expect(peerOptions(make(KEY, "receiver", { ...LOCAL, apiKey: "peerjs" })).key).to.equal("peerjs");
     });
     it("refuses an API key that PeerJS would write into the signalling URL unencoded", () => {
-        for (const apiKey of ["", "a&id=other", "a b", "a/b", "a?b", "é", "x".repeat(65), 42, null]) {
+        for (const apiKey of ["", "a&id=other", "a b", "a/b", "a?b", "é", "x".repeat(65), ".", "..", "-x", "~x", 42, null]) {
             expect(() => new PeerjsChannel(undefined, "initiator", asOptions({ ...LOCAL, apiKey })), String(apiKey)).to.throw(/apiKey/);
             expect(() => buildConnectionString(KEY, asOptions({ ...LOCAL, apiKey })), String(apiKey)).to.throw(/apiKey/);
         }

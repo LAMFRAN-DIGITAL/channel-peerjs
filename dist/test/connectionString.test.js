@@ -54,6 +54,8 @@ describe("PeerJS connection string", () => {
             `${base}&ice=W10&apikey=a%26id%3Dother`,
             `${base}&ice=W10&apikey=a%20b`,
             `${base}&ice=W10&apikey=${"x".repeat(65)}`,
+            `${base}&ice=W10&apikey=%2E%2E`,
+            `${base}&ice=W10&apikey=.`,
         ]) {
             expect(parseConnectionString(bad, ALLOWED), bad).to.equal(null);
         }

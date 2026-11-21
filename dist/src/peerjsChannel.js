@@ -7,8 +7,12 @@ const ICE_SCHEME = /^(stun|stuns|turn|turns):[^\s]{1,253}$/;
 const HOST = /^[A-Za-z0-9.-]{1,253}$/;
 const PATH = /^\/[A-Za-z0-9._~\/-]{0,200}$/;
 const KEY = /^[0-9a-f]{64}$/;
-/** RFC 3986 unreserved characters only: PeerJS concatenates the API key into the signalling URL as is. */
-const API_KEY = /^[A-Za-z0-9._~-]{1,64}$/;
+/**
+ * RFC 3986 unreserved characters only: PeerJS concatenates the API key into the signalling URL as is. It starts with a
+ * letter or a digit: PeerJS also puts it in the path of its HTTP API (`${path}${key}/${method}`), where `.` or `..`
+ * would be resolved as a path segment.
+ */
+const API_KEY = /^[A-Za-z0-9][A-Za-z0-9._~-]{0,63}$/;
 /** PeerJS's own default API key (`Peer.DEFAULT_KEY`), and the `peer` server's. */
 export const DEFAULT_API_KEY = "peerjs";
 const b64url = (text) => crypto.Buffer.from(text, "utf-8").toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
