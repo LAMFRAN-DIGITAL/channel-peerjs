@@ -24,6 +24,13 @@ export interface PeerjsChannelOptions {
     /** Use TLS for signalling (default true). */
     secure?: boolean;
     /**
+     * API key of the PeerJS server (PeerJS's `key` option; default `"peerjs"`, the default of PeerJS and of the `peer`
+     * server). NOT a secret and never an access control: it travels in clear in the signalling URL, in the connection
+     * string and in every client. Letters, digits and `.`, `_`, `~`, `-` only, 1 to 64 characters (PeerJS writes it
+     * into the signalling URL without encoding it).
+     */
+    apiKey?: string;
+    /**
      * ICE servers given to WebRTC (mandatory, no default: PeerJS's public STUN/TURN servers are never used). `[]`: no
      * STUN/TURN at all (host candidates only: same network, or a peer with a public address).
      */
@@ -46,13 +53,18 @@ export interface PeerjsReceiverOptions {
     /** PeerJS log level (0 none … 3 all, default 0). */
     debug?: PeerjsChannelOptions["debug"];
 }
+/** PeerJS's own default API key (`Peer.DEFAULT_KEY`), and the `peer` server's. */
+export declare const DEFAULT_API_KEY = "peerjs";
 /** Strictly validates ICE servers coming from a connection string (a QR code is untrusted input). */
 export declare function validIceServers(value: unknown): IceServer[] | null;
-/** Throws a clear error unless a signalling host and an explicit list of ICE servers are given. */
+/**
+ * Throws a clear error unless a signalling host and an explicit list of ICE servers are given, and the API key, if
+ * any, is well formed.
+ */
 export declare function checkOptions(options: unknown): asserts options is PeerjsChannelOptions;
 /**
- * Builds `vaultys://peerjs?key=…&host=…[&port=…][&path=…][&secure=0]&ice=…`. `ice` is the base64url of the JSON
- * array of ICE servers, always present.
+ * Builds `vaultys://peerjs?key=…&host=…[&port=…][&path=…][&secure=0][&apikey=…]&ice=…`. `ice` is the base64url of the
+ * JSON array of ICE servers, always present; `apikey` only when it is not the default `peerjs`.
  */
 export declare function buildConnectionString(key: string, options: PeerjsChannelOptions): string;
 /**

@@ -25,6 +25,15 @@ describe("PeerJS connection string", () => {
     expect(parseConnectionString(text, ALLOWED)).to.deep.equal({ key: KEY, options });
   });
 
+  it("carries the API key only when it is not the default `peerjs`", () => {
+    const base = { host: "peer.example.org", iceServers: [] };
+    expect(buildConnectionString(KEY, { ...base, apiKey: "peerjs" })).to.equal(buildConnectionString(KEY, base));
+    const text = buildConnectionString(KEY, { ...base, apiKey: "sas-relay" });
+    expect(text).to.equal(`vaultys://peerjs?key=${KEY}&host=peer.example.org&apikey=sas-relay&ice=W10`);
+    expect(parseConnectionString(text, ALLOWED)).to.deep.equal({ key: KEY, options: { host: "peer.example.org", secure: true, iceServers: [], apiKey: "sas-relay" } });
+    expect(parseConnectionString(`vaultys://peerjs?key=${KEY}&host=peer.example.org&apikey=peerjs&ice=W10`, ALLOWED)?.options.apiKey).to.equal("peerjs");
+  });
+
   it("can say « no STUN/TURN at all » (empty list), instead of PeerJS public servers", () => {
     const parsed = parseConnectionString(buildConnectionString(KEY, { host: "peer.example.org", iceServers: [] }), ALLOWED);
     expect(parsed?.options.iceServers).to.deep.equal([]);
@@ -47,6 +56,10 @@ describe("PeerJS connection string", () => {
       ice([{ urls: "stun:a" }, { urls: "stun:b" }, { urls: "stun:c" }, { urls: "stun:d" }, { urls: "stun:e" }]),
       ice([{ urls: "stun:a", extra: 1 }]),
       `${base}&ice=${"A".repeat(3000)}`,
+      `${base}&ice=W10&apikey=`,
+      `${base}&ice=W10&apikey=a%26id%3Dother`,
+      `${base}&ice=W10&apikey=a%20b`,
+      `${base}&ice=W10&apikey=${"x".repeat(65)}`,
     ]) {
       expect(parseConnectionString(bad, ALLOWED), bad).to.equal(null);
     }
