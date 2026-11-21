@@ -42,6 +42,20 @@ describe("PeerjsChannel mandatory options (no network)", () => {
     expect(JSON.stringify((none.peer as unknown as { options: unknown }).options)).not.to.match(/google|peerjs\.com|92k\.de/);
   });
 
+  it("passes the API key to PeerJS: `peerjs` by default, the given one otherwise", () => {
+    const peerOptions = (channel: PeerjsChannel) => (channel.peer as unknown as { options: { key: string } }).options;
+    expect(peerOptions(make(undefined, "initiator", LOCAL)).key).to.equal("peerjs");
+    expect(peerOptions(make(undefined, "initiator", { ...LOCAL, apiKey: "sas-relay_1.0~x" })).key).to.equal("sas-relay_1.0~x");
+    expect(peerOptions(make(KEY, "receiver", { ...LOCAL, apiKey: "peerjs" })).key).to.equal("peerjs");
+  });
+
+  it("refuses an API key that PeerJS would write into the signalling URL unencoded", () => {
+    for (const apiKey of ["", "a&id=other", "a b", "a/b", "a?b", "é", "x".repeat(65), 42, null]) {
+      expect(() => new PeerjsChannel(undefined, "initiator", asOptions({ ...LOCAL, apiKey })), String(apiKey)).to.throw(/apiKey/);
+      expect(() => buildConnectionString(KEY, asOptions({ ...LOCAL, apiKey })), String(apiKey)).to.throw(/apiKey/);
+    }
+  });
+
   it("fromConnectionString: refuses a host outside the allowed list, accepts one inside", () => {
     const text = buildConnectionString(KEY, { host: "localhost", port: 9, secure: false, iceServers: [] });
     expect(PeerjsChannel.fromConnectionString(text, { allowedHosts: ["peer.example.org"] })).to.equal(null);
@@ -62,5 +76,13 @@ describe("PeerjsChannel mandatory options (no network)", () => {
     receiver!.peer.destroy();
     expect(receiver!.key).to.equal(initiator.key);
     expect(receiver!.options).to.deep.equal({ host: "localhost", port: 9, secure: false, iceServers: [] });
+  });
+
+  it("getConnectionString carries a non-default API key to the receiver", () => {
+    const initiator = make(undefined, "initiator", { ...LOCAL, apiKey: "sas-relay" });
+    const receiver = PeerjsChannel.fromConnectionString(initiator.getConnectionString(), { allowedHosts: ["localhost"] });
+    receiver!.peer.destroy();
+    expect(receiver!.options.apiKey).to.equal("sas-relay");
+    expect((receiver!.peer as unknown as { options: { key: string } }).options.key).to.equal("sas-relay");
   });
 });

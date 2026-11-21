@@ -7,6 +7,10 @@ const ICE_SCHEME = /^(stun|stuns|turn|turns):[^\s]{1,253}$/;
 const HOST = /^[A-Za-z0-9.-]{1,253}$/;
 const PATH = /^\/[A-Za-z0-9._~\/-]{0,200}$/;
 const KEY = /^[0-9a-f]{64}$/;
+/** RFC 3986 unreserved characters only: PeerJS concatenates the API key into the signalling URL as is. */
+const API_KEY = /^[A-Za-z0-9._~-]{1,64}$/;
+/** PeerJS's own default API key (`Peer.DEFAULT_KEY`), and the `peer` server's. */
+export const DEFAULT_API_KEY = "peerjs";
 const b64url = (text) => crypto.Buffer.from(text, "utf-8").toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const fromB64url = (text) => crypto.Buffer.from(text.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf-8");
 /** Strictly validates ICE servers coming from a connection string (a QR code is untrusted input). */
@@ -31,19 +35,25 @@ export function validIceServers(value) {
     }
     return out;
 }
-/** Throws a clear error unless a signalling host and an explicit list of ICE servers are given. */
+/**
+ * Throws a clear error unless a signalling host and an explicit list of ICE servers are given, and the API key, if
+ * any, is well formed.
+ */
 export function checkOptions(options) {
-    const { host, iceServers } = (options ?? {});
+    const { host, iceServers, apiKey } = (options ?? {});
     if (typeof host !== "string" || !HOST.test(host)) {
         throw new Error("PeerjsChannel: a signalling server `host` is mandatory (there is no default public server)");
     }
     if (iceServers === undefined || validIceServers(iceServers) === null) {
         throw new Error("PeerjsChannel: `iceServers` is mandatory (an explicit list, `[]` for none); PeerJS public STUN/TURN servers are never used");
     }
+    if (apiKey !== undefined && (typeof apiKey !== "string" || !API_KEY.test(apiKey))) {
+        throw new Error("PeerjsChannel: invalid `apiKey` (1 to 64 letters, digits, `.`, `_`, `~` or `-`)");
+    }
 }
 /**
- * Builds `vaultys://peerjs?key=…&host=…[&port=…][&path=…][&secure=0]&ice=…`. `ice` is the base64url of the JSON
- * array of ICE servers, always present.
+ * Builds `vaultys://peerjs?key=…&host=…[&port=…][&path=…][&secure=0][&apikey=…]&ice=…`. `ice` is the base64url of the
+ * JSON array of ICE servers, always present; `apikey` only when it is not the default `peerjs`.
  */
 export function buildConnectionString(key, options) {
     checkOptions(options);
@@ -54,6 +64,8 @@ export function buildConnectionString(key, options) {
         params.set("path", options.path);
     if (options.secure === false)
         params.set("secure", "0");
+    if (options.apiKey !== undefined && options.apiKey !== DEFAULT_API_KEY)
+        params.set("apikey", options.apiKey);
     params.set("ice", b64url(JSON.stringify(options.iceServers)));
     return `vaultys://peerjs?${params.toString()}`;
 }
@@ -91,6 +103,12 @@ export function parseConnectionString(string, allowedHosts) {
         if (!PATH.test(path))
             return null;
         options.path = path;
+    }
+    const apiKey = p.get("apikey");
+    if (apiKey !== null) {
+        if (!API_KEY.test(apiKey))
+            return null;
+        options.apiKey = apiKey;
     }
     // ICE servers are mandatory: without them the receiver would fall back to PeerJS public STUN/TURN servers.
     const ice = p.get("ice");
@@ -140,6 +158,8 @@ export class PeerjsChannel {
             secure: this.options.secure ?? true,
             ...(this.options.port !== undefined ? { port: this.options.port } : {}),
             ...(this.options.path !== undefined ? { path: this.options.path } : {}),
+            // Always given, so that the key in use is the one of these options, never an implicit default.
+            key: this.options.apiKey ?? DEFAULT_API_KEY,
             // Always given: without `config`, PeerJS 1.5.5 uses its own public STUN/TURN servers (Google, peerjs.com) ;
             // with it, ONLY the given ones (`config` replaces PeerJS's default configuration as a whole).
             config: { iceServers: this.options.iceServers },
