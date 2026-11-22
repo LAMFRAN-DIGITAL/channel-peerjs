@@ -8,34 +8,26 @@
   "author": "François-Xavier Thoorens <fx.thoorens@vaultys.com>",
   "license": "MIT",
   "scripts": {
-    "build:test": "webpack --config webpack.test.config.js",
-    "test:server": "http-server . -p 8080",
-    "test:browser": "mocha --require tsx test/setup.ts --timeout 10000",
     "test:node": "mocha --require tsx test/*.test.ts --timeout 10000",
     "build": "tsc",
     "prettier": "find src -name \"*.js\" | xargs prettier --trailing-comma=all --write"
   },
   "dependencies": {
-    "peerjs": "^1.5.5"
+    "peerjs": "1.5.5"
   },
   "peerDependencies": {
     "@vaultys/id": ">=2.4.1"
   },
   "devDependencies": {
-    "@playwright/test": "^1.51.1",
-    "@types/chai": "^5.2.0",
-    "@types/mocha": "^10.0.10",
-    "@types/node": "^22.13.10",
-    "chai": "^5.2.0",
-    "http-server": "^14.1.1",
-    "mocha": "^10.8.2",
-    "playwright": "^1.51.1",
-    "prettier": "^3.5.3",
-    "ts-loader": "^9.5.2",
-    "tsx": "^4.19.3",
-    "typescript": "^5.8.2",
-    "webpack": "^5.98.0",
-    "webpack-cli": "^6.0.1"
+    "@types/chai": "5.2.3",
+    "@types/mocha": "10.0.10",
+    "@types/node": "26.6.6",
+    "@vaultys/id": "3.0.4",
+    "chai": "6.3.0",
+    "mocha": "12.0.3",
+    "prettier": "3.10.1",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2"
   },
-  "packageManager": "pnpm@9.7.0+sha512.dc09430156b427f5ecfc79888899e1c39d2d690f004be70e05230b72cb173d96839587545d09429b55ac3c429c801b4dc3c0e002f653830a420fa2dd4e3cf9cf"
+  "packageManager": "pnpm@12.21.0"
 }
