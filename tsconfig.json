@@ -6,7 +6,11 @@
       "ES2021",
       "DOM"
     ],
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
+    "types": [
+      "mocha",
+      "node"
+    ],
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
