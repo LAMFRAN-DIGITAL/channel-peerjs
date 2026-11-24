@@ -100,53 +100,58 @@ describe("PeerJS connection string, allowed hosts", () => {
   });
 });
 
-describe("PeerJS connection string, service of the initiator", () => {
+describe("PeerJS connection string, origin of the initiator", () => {
   const base = { host: "peer.example.org", iceServers: [] };
 
-  it("carries the service only when given, before `ice` (round trip)", () => {
-    expect(buildConnectionString(KEY, base)).to.not.include("service=");
-    const text = buildConnectionString(KEY, { ...base, service: "https://salon.example.org" });
-    expect(text).to.equal(`vaultys://peerjs?key=${KEY}&host=peer.example.org&service=https%3A%2F%2Fsalon.example.org&ice=W10`);
-    expect(parseConnectionString(text, ALLOWED)).to.deep.equal({ key: KEY, options: { ...base, secure: true, service: "https://salon.example.org" } });
+  it("carries the origin only when given, before `ice` (round trip)", () => {
+    expect(buildConnectionString(KEY, base)).to.not.include("origin=");
+    const text = buildConnectionString(KEY, { ...base, origin: "https://salon.example.org" });
+    expect(text).to.equal(`vaultys://peerjs?key=${KEY}&host=peer.example.org&origin=https%3A%2F%2Fsalon.example.org&ice=W10`);
+    expect(parseConnectionString(text, ALLOWED)).to.deep.equal({ key: KEY, options: { ...base, secure: true, origin: "https://salon.example.org" } });
   });
 
   it("keeps a port and accepts http (canonicity and development hosts are the receiver's check)", () => {
-    for (const service of ["https://salon.example.org:8443", "http://localhost:3202"]) {
-      expect(parseConnectionString(buildConnectionString(KEY, { ...base, service }), ALLOWED)?.options.service, service).to.equal(service);
+    for (const origin of ["https://salon.example.org:8443", "http://localhost:3202"]) {
+      expect(parseConnectionString(buildConnectionString(KEY, { ...base, origin }), ALLOWED)?.options.origin, origin).to.equal(origin);
     }
   });
 
-  it("refuses the whole string for a repeated or malformed service (never a guess)", () => {
+  it("refuses the whole string for a repeated or malformed origin (never a guess)", () => {
     const head = `vaultys://peerjs?key=${KEY}&host=peer.example.org&ice=W10`;
     for (const bad of [
-      `${head}&service=https%3A%2F%2Fa.example.org&service=https%3A%2F%2Fb.example.org`,
-      `${head}&service=`,
-      `${head}&service=salon.example.org`,
-      `${head}&service=app%3Afr.example.salon`,
-      `${head}&service=contact%3A${"a".repeat(64)}`,
-      `${head}&service=https%3A%2F%2Fa.example.org%2F%3Fx`,
-      `${head}&service=https%3A%2F%2Fa.example.org%23x`,
-      `${head}&service=https%3A%2F%2Fu%40a.example.org`,
-      `${head}&service=https%3A%2F%2Fa.example.org%2F%2525`,
-      `${head}&service=https%3A%2F%2Fa.example.org%5C`,
-      `${head}&service=https%3A%2F%2Fa%20b.example.org`,
-      `${head}&service=https%3A%2F%2F%C3%A9.example.org`,
-      `${head}&service=https%3A%2F%2F${"a".repeat(300)}`,
+      `${head}&origin=https%3A%2F%2Fa.example.org&origin=https%3A%2F%2Fb.example.org`,
+      `${head}&origin=`,
+      `${head}&origin=salon.example.org`,
+      `${head}&origin=app%3Afr.example.salon`,
+      `${head}&origin=contact%3A${"a".repeat(64)}`,
+      `${head}&origin=https%3A%2F%2Fa.example.org%2F%3Fx`,
+      `${head}&origin=https%3A%2F%2Fa.example.org%23x`,
+      `${head}&origin=https%3A%2F%2Fu%40a.example.org`,
+      `${head}&origin=https%3A%2F%2Fa.example.org%2F%2525`,
+      `${head}&origin=https%3A%2F%2Fa.example.org%5C`,
+      `${head}&origin=https%3A%2F%2Fa%20b.example.org`,
+      `${head}&origin=https%3A%2F%2F%C3%A9.example.org`,
+      `${head}&origin=https%3A%2F%2F${"a".repeat(300)}`,
     ]) {
       expect(parseConnectionString(bad, ALLOWED), bad).to.equal(null);
     }
   });
 
-  it("refuses to build a string with a malformed service", () => {
-    for (const service of ["", "salon.example.org", "https://a.example.org/?x", "https://u@a.example.org", "app:fr.example"]) {
-      expect(() => buildConnectionString(KEY, { ...base, service }), service).to.throw(/service/);
+  it("refuses to build a string with a malformed origin", () => {
+    for (const origin of ["", "salon.example.org", "https://a.example.org/?x", "https://u@a.example.org", "app:fr.example"]) {
+      expect(() => buildConnectionString(KEY, { ...base, origin }), origin).to.throw(/origin/);
     }
   });
 
+  it("ignores the Vaultys application's handshake hints, `service=auth` included", () => {
+    const text = `vaultys://peerjs?key=${KEY}&host=peer.example.org&ice=W10&protocol=p2p&service=auth&v=1&name=LAM+Salon&origin=https%3A%2F%2Fsalon.example.org`;
+    expect(parseConnectionString(text, ALLOWED)).to.deep.equal({ key: KEY, options: { ...base, secure: true, origin: "https://salon.example.org" } });
+  });
+
   it("is ignored by a receiver that does not read it: the rest of the string is unchanged", () => {
-    const withService = parseConnectionString(buildConnectionString(KEY, { ...base, service: "https://salon.example.org" }), ALLOWED);
-    const { service, ...rest } = withService!.options;
-    expect(service).to.equal("https://salon.example.org");
+    const withService = parseConnectionString(buildConnectionString(KEY, { ...base, origin: "https://salon.example.org" }), ALLOWED);
+    const { origin, ...rest } = withService!.options;
+    expect(origin).to.equal("https://salon.example.org");
     expect({ key: withService!.key, options: rest }).to.deep.equal(parseConnectionString(buildConnectionString(KEY, base), ALLOWED));
   });
 });
