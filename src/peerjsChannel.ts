@@ -45,6 +45,12 @@ export interface PeerjsChannelOptions {
    * proof: the receiver MUST check it with `canonicalServiceId` of `@vaultys/id`, then verify the anchor.
    */
   service?: string;
+  /**
+   * WebRTC `iceTransportPolicy`: `"relay"` sends everything through the TURN servers of `iceServers` (the peer never
+   * sees this side's addresses, and no host candidate is tried); default `"all"` (WebRTC's own default). Local to this
+   * side: never carried by the connection string.
+   */
+  iceTransportPolicy?: "all" | "relay";
   /** PeerJS log level (0 none … 3 all, default 0). Message contents are never logged. */
   debug?: 0 | 1 | 2 | 3;
 }
@@ -128,7 +134,10 @@ export function checkOptions(options: unknown): asserts options is PeerjsChannel
   if (apiKey !== undefined && (typeof apiKey !== "string" || !API_KEY.test(apiKey))) {
     throw new Error("PeerjsChannel: invalid `apiKey` (1 to 64 letters, digits, `.`, `_`, `~` or `-`)");
   }
-  const { service } = (options ?? {}) as Partial<PeerjsChannelOptions>;
+  const { service, iceTransportPolicy } = (options ?? {}) as Partial<PeerjsChannelOptions>;
+  if (iceTransportPolicy !== undefined && iceTransportPolicy !== "all" && iceTransportPolicy !== "relay") {
+    throw new Error("PeerjsChannel: invalid `iceTransportPolicy` (\"all\" or \"relay\")");
+  }
   if (service !== undefined && validServiceParameter(service) === null) {
     throw new Error("PeerjsChannel: invalid `service` (a canonical web origin, rfc/SERVICE-IDENTITIES.md §3.2)");
   }
@@ -258,7 +267,7 @@ export class PeerjsChannel implements Channel {
       key: this.options.apiKey ?? DEFAULT_API_KEY,
       // Always given: without `config`, PeerJS 1.5.5 uses its own public STUN/TURN servers (Google, peerjs.com) ;
       // with it, ONLY the given ones (`config` replaces PeerJS's default configuration as a whole).
-      config: { iceServers: this.options.iceServers },
+      config: { iceServers: this.options.iceServers, ...(this.options.iceTransportPolicy !== undefined ? { iceTransportPolicy: this.options.iceTransportPolicy } : {}) },
       logFunction: (level: LogLevel | string, ...rest: unknown[]) => {
         if (level.toString() === "Error:") {
           this._onError?.(String(rest[0]));

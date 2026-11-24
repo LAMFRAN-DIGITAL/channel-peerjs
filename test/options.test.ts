@@ -42,6 +42,16 @@ describe("PeerjsChannel mandatory options (no network)", () => {
     expect(JSON.stringify((none.peer as unknown as { options: unknown }).options)).not.to.match(/google|peerjs\.com|92k\.de/);
   });
 
+  it("passes `iceTransportPolicy` to WebRTC only when given, and never in the connection string", () => {
+    const config = (c: PeerjsChannel) => (c.peer as unknown as { options: { config: RTCConfiguration } }).options.config;
+    const ice = [{ urls: "turns:turn.example.org:5349", username: "u", credential: "p" }];
+    expect(config(make(KEY, "receiver", { ...LOCAL, iceServers: ice, iceTransportPolicy: "relay" }))).to.deep.equal({ iceServers: ice, iceTransportPolicy: "relay" });
+    expect(config(make(KEY, "receiver", { ...LOCAL, iceTransportPolicy: "all" }))).to.deep.equal({ iceServers: [], iceTransportPolicy: "all" });
+    expect(config(make(KEY, "receiver", LOCAL))).to.not.have.property("iceTransportPolicy");
+    expect(() => make(KEY, "receiver", asOptions({ ...LOCAL, iceTransportPolicy: "none" }))).to.throw(/iceTransportPolicy/);
+    expect(make(KEY, "receiver", { ...LOCAL, iceTransportPolicy: "relay" }).getConnectionString()).to.not.include("relay");
+  });
+
   it("passes the API key to PeerJS: `peerjs` by default, the given one otherwise", () => {
     const peerOptions = (channel: PeerjsChannel) => (channel.peer as unknown as { options: { key: string } }).options;
     expect(peerOptions(make(undefined, "initiator", LOCAL)).key).to.equal("peerjs");
