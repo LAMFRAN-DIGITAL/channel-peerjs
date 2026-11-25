@@ -38,6 +38,20 @@ export interface PeerjsChannelOptions {
    * STUN/TURN at all (host candidates only: same network, or a peer with a public address).
    */
   iceServers: IceServer[];
+  /**
+   * Canonical service id of the initiator, a web origin (vaultysid `rfc/SERVICE-IDENTITIES.md` §3.2), carried by the
+   * connection string as `origin` (not `service`: the Vaultys application already reads `service` as the name of the
+   * handshake operation, `auth`) so that the receiver knows which origin to fetch the service anchor from (§8) and
+   * which service to bind the handshake to (`rfc/SECURE-CHANNEL.md` §4). Not used by the channel itself; never a
+   * proof: the receiver MUST check it with `canonicalServiceId` of `@vaultys/id`, then verify the anchor.
+   */
+  origin?: string;
+  /**
+   * WebRTC `iceTransportPolicy`: `"relay"` sends everything through the TURN servers of `iceServers` (the peer never
+   * sees this side's addresses, and no host candidate is tried); default `"all"` (WebRTC's own default). Local to this
+   * side: never carried by the connection string.
+   */
+  iceTransportPolicy?: "all" | "relay";
   /** PeerJS log level (0 none … 3 all, default 0). Message contents are never logged. */
   debug?: 0 | 1 | 2 | 3;
 }
@@ -71,11 +85,23 @@ const KEY = /^[0-9a-f]{64}$/;
  * would be resolved as a path segment.
  */
 const API_KEY = /^[A-Za-z0-9][A-Za-z0-9._~-]{0,63}$/;
+/**
+ * Pre-filter of `origin` only (vaultysid `rfc/SERVICE-IDENTITIES.md` §3.1, plus a web-origin scheme): printable ASCII,
+ * at most 300 characters, none of `%`, `\`, `@`, `?`, `#`. Canonicity is NOT checked here (this package does not
+ * depend on the fork's `canonicalServiceId`): the receiver checks it before any use.
+ */
+const SERVICE = /^https?:\/\/[\x21-\x7e]{1,292}$/i;
+const SERVICE_FORBIDDEN = /[%\\@?#]/;
 /** PeerJS's own default API key (`Peer.DEFAULT_KEY`), and the `peer` server's. */
 export const DEFAULT_API_KEY = "peerjs";
 
 const b64url = (text: string) => crypto.Buffer.from(text, "utf-8").toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 const fromB64url = (text: string) => crypto.Buffer.from(text.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf-8");
+
+/** `origin` of a connection string: the pre-filter above, or `null`. */
+export function validOriginParameter(value: unknown): string | null {
+  return typeof value === "string" && value.length <= 300 && SERVICE.test(value) && !SERVICE_FORBIDDEN.test(value) ? value : null;
+}
 
 /** Strictly validates ICE servers coming from a connection string (a QR code is untrusted input). */
 export function validIceServers(value: unknown): IceServer[] | null {
@@ -109,11 +135,19 @@ export function checkOptions(options: unknown): asserts options is PeerjsChannel
   if (apiKey !== undefined && (typeof apiKey !== "string" || !API_KEY.test(apiKey))) {
     throw new Error("PeerjsChannel: invalid `apiKey` (1 to 64 letters, digits, `.`, `_`, `~` or `-`)");
   }
+  const { origin, iceTransportPolicy } = (options ?? {}) as Partial<PeerjsChannelOptions>;
+  if (iceTransportPolicy !== undefined && iceTransportPolicy !== "all" && iceTransportPolicy !== "relay") {
+    throw new Error("PeerjsChannel: invalid `iceTransportPolicy` (\"all\" or \"relay\")");
+  }
+  if (origin !== undefined && validOriginParameter(origin) === null) {
+    throw new Error("PeerjsChannel: invalid `origin` (a canonical web origin, rfc/SERVICE-IDENTITIES.md §3.2)");
+  }
 }
 
 /**
- * Builds `vaultys://peerjs?key=…&host=…[&port=…][&path=…][&secure=0][&apikey=…]&ice=…`. `ice` is the base64url of the
- * JSON array of ICE servers, always present; `apikey` only when it is not the default `peerjs`.
+ * Builds `vaultys://peerjs?key=…&host=…[&port=…][&path=…][&secure=0][&apikey=…][&origin=…]&ice=…`. `ice` is the
+ * base64url of the JSON array of ICE servers, always present; `apikey` only when it is not the default `peerjs`;
+ * `origin` only when given. Receivers that do not know `origin` ignore it (vaultysid `rfc/PROTOCOL.md` §7.4).
  */
 export function buildConnectionString(key: string, options: PeerjsChannelOptions): string {
   checkOptions(options);
@@ -122,6 +156,7 @@ export function buildConnectionString(key: string, options: PeerjsChannelOptions
   if (options.path !== undefined && options.path !== "/") params.set("path", options.path);
   if (options.secure === false) params.set("secure", "0");
   if (options.apiKey !== undefined && options.apiKey !== DEFAULT_API_KEY) params.set("apikey", options.apiKey);
+  if (options.origin !== undefined) params.set("origin", options.origin);
   params.set("ice", b64url(JSON.stringify(options.iceServers)));
   return `vaultys://peerjs?${params.toString()}`;
 }
@@ -159,6 +194,15 @@ export function parseConnectionString(string: string, allowedHosts: readonly str
   if (apiKey !== null) {
     if (!API_KEY.test(apiKey)) return null;
     options.apiKey = apiKey;
+  }
+  // `origin` names who the receiver expects: given twice, it is ambiguous, so the whole string is refused. `service`,
+  // `protocol`, `v`, `id` and `name` are the Vaultys application's handshake hints (`service=auth`): ignored here.
+  const origins = p.getAll("origin");
+  if (origins.length > 1) return null;
+  if (origins.length === 1) {
+    const origin = validOriginParameter(origins[0]);
+    if (origin === null) return null;
+    options.origin = origin;
   }
   // ICE servers are mandatory: without them the receiver would fall back to PeerJS public STUN/TURN servers.
   const ice = p.get("ice");
@@ -225,7 +269,7 @@ export class PeerjsChannel implements Channel {
       key: this.options.apiKey ?? DEFAULT_API_KEY,
       // Always given: without `config`, PeerJS 1.5.5 uses its own public STUN/TURN servers (Google, peerjs.com) ;
       // with it, ONLY the given ones (`config` replaces PeerJS's default configuration as a whole).
-      config: { iceServers: this.options.iceServers },
+      config: { iceServers: this.options.iceServers, ...(this.options.iceTransportPolicy !== undefined ? { iceTransportPolicy: this.options.iceTransportPolicy } : {}) },
       logFunction: (level: LogLevel | string, ...rest: unknown[]) => {
         if (level.toString() === "Error:") {
           this._onError?.(String(rest[0]));
